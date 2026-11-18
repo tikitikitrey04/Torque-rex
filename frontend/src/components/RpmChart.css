@@ -1,0 +1,15 @@
+.rpm-chart { min-width: 0; padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.rpm-chart__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-2); }
+.rpm-chart h1 { font-size: var(--text-lg); font-weight: 650; }
+.rpm-chart p, .rpm-chart__reading span, .rpm-chart__reading small { color: var(--color-muted); font-size: var(--text-sm); }
+.rpm-chart__reading { font-family: var(--font-mono); }
+.rpm-chart__reading strong { font-size: var(--text-xl); font-weight: 600; }
+.rpm-chart__reading small { display: block; text-align: right; }
+.rpm-chart__plot { position: relative; }
+.rpm-chart svg { display: block; width: 100%; height: auto;  }
+.rpm-chart text { fill: var(--color-muted); font-family: var(--font-mono); font-size: 12px; }
+.rpm-chart__grid { stroke: var(--color-border); stroke-width: 1; }
+.rpm-chart__line { fill: none; stroke: var(--color-accent); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.rpm-chart__point { fill: var(--color-accent); }
+.rpm-chart__empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-muted); font-size: var(--text-sm); pointer-events: none; }
+.rpm-chart__caption { margin-top: var(--space-2); }
