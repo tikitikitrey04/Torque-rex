@@ -36,7 +36,7 @@ Torque-rex/
 
 Reported successful hardware tests include USB programming, detection of 16 MB flash and 8 MB PSRAM, Vite production builds, and serving the React application from LittleFS at `http://192.168.4.1` on the `Torque-rex` access point.
 
-The current code implements static HTTP hosting and a fallback for client-side routes. The frontend provides a minimal workspace with centralized design tokens, reusable UI components, and persistent light/dark/system appearance. Sensor acquisition, motor control, live measurements, test automation, a functional sensor-data API, and WebSockets are planned. OTA updates are not implemented.
+The current code implements static HTTP hosting, a fallback for client-side routes, and AS5600 RPM telemetry at `/api/telemetry`. The frontend provides a minimal workspace with centralized design tokens, reusable UI components, and persistent light/dark/system appearance. AS5600 acquisition and live RPM plotting are implemented but require hardware validation. Torque/electrical sensing, motor control, test automation, and WebSockets remain planned. OTA updates are not implemented.
 
 ## Developer quick start
 
@@ -45,3 +45,36 @@ The current code implements static HTTP hosting and a fallback for client-side r
 3. Open `firmware/` as a PlatformIO project and upload firmware over USB using the [firmware guide](firmware/README.md).
 4. Build the frontend, copy the contents of `frontend/dist/` into `firmware/data/`, and upload the filesystem image. See the [frontend deployment steps](frontend/README.md#deploy-to-the-esp32).
 5. Connect to Wi-Fi `Torque-rex` with password `TorqueRex2026`, then open `http://192.168.4.1`.
+
+## ESP32 pinout and AS5600 encoder
+
+The firmware assigns these pins on the ESP32-S3-N16R8 development board. GPIO numbers are not physical header positions; follow your board's silkscreen.
+
+| ESP32 connection | AS5600 breakout connection | Purpose |
+| --- | --- | --- |
+| 3V3 | 3.3 V-compatible supply input | Encoder power; verify the breakout's supply requirements |
+| GND | GND | Shared ground |
+| GPIO 8 | SDA | I²C data |
+| GPIO 9 | SCL | I²C clock |
+| GND | DIR, if exposed | Fix angle direction; RPM is reported as magnitude |
+| Unconnected | OUT | Analog/PWM output is unused |
+
+Use 3.3 V I²C pull-ups (typically 4.7 kΩ if the breakout does not already provide them); never pull SDA/SCL up to 5 V. For a bare AS5600 IC in 3.3 V mode, connect VDD5V and VDD3V3 together to 3.3 V and provide the datasheet's decoupling. Breakout boards differ: check their schematic before connecting power. PGO is unused; leave it at its default pull-up state. Use a diametrically magnetized magnet centered over the sensor and coupled to the measured shaft. No OTP programming is performed.
+
+The implementation follows the [ams OSRAM AS5600 datasheet](https://s3.amazonaws.com/snapeda/datasheet/AS5600_Ams_AG.pdf): address `0x36`, status register `0x0B`, and 12-bit raw angle at `0x0C–0x0D`. The bus runs at 400 kHz. Pin assignments are constants in `firmware/src/Encoder.cpp`.
+
+### Live RPM and validation
+
+A dedicated task samples approximately every RTOS tick (normally 1 ms). Firmware unwraps signed angle differences and reports the magnitude of net rotation over 100 ms, so either rotation direction works and a stationary shaft reads approximately zero. React polls `/api/telemetry` every 250 ms and plots the latest RPM on its existing 60-second graph. Collection starts automatically after boot; `running` means live acquisition, including when the shaft is stopped. A new boot creates a new session and clears the graph on the next successful poll.
+
+Angle unwrapping requires less than half a revolution between readings. The implementation rejects gaps above 5 ms; at a 5 ms gap, the mathematical limit is strictly below 6,000 RPM. Operate comfortably below this bound until validated against a reference tachometer. Higher speeds can alias into plausible incorrect readings and cannot reliably be detected from angle samples alone. Sensor filtering, magnet alignment, bus noise, and task scheduling also affect accuracy. This is not a motor protection or overspeed cutoff.
+
+Missing I²C responses, invalid magnet strength/detection, and sampling delays produce `error` with a diagnostic message. Invalid readings are not appended to the graph; prior points remain visible. Recovery automatically starts a fresh 100 ms averaging window. A failed HTTP request instead produces `Disconnected`.
+
+1. Wire the encoder with power off, then upload the updated **firmware**.
+2. Build/copy the frontend and **Upload Filesystem Image** using the [frontend guide](frontend/README.md#deploy-to-the-esp32).
+3. Connect to `Torque-rex` and open `http://192.168.4.1/api/telemetry`; expect JSON with `status: "running"` and approximately zero RPM when stationary.
+4. Open the dashboard and turn the magnet/shaft in either direction; verify live graph updates. Compare against a known speed before using measurements.
+5. Remove the magnet or disconnect the encoder to confirm an error, then reconnect and verify recovery. Power off before changing wiring.
+
+Local Vite development still needs a `/api` proxy to the ESP32 or a mock endpoint; requests are same-origin by default.

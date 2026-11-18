@@ -82,11 +82,11 @@ During standalone operation the ESP32 serves these static files from LittleFS, a
 
 `src/components/SuiteStatus.tsx` accepts a typed `status` (`ready`, `running`, `completed`, `error`, or `disconnected`) and an optional descriptive `message`. Status uses both text and theme-aware color, and changes are announced to assistive technology. Status colors are configured in `tokens.css`.
 
-`App.tsx` reads status and samples through `useTelemetry()`. Until a device telemetry endpoint is available, the header shows Disconnected and the chart waits for data.
+`App.tsx` reads status and samples through `useTelemetry()`. The AS5600 firmware endpoint supplies live RPM. The header shows Running during acquisition, Error for encoder faults, and Disconnected when telemetry requests fail.
 
-## Future firmware communication
+## Firmware telemetry
 
-The frontend polls `GET /api/telemetry` every 250 ms with no overlapping requests, a 3-second timeout, and a 1-second retry after failure. **The firmware endpoint and RPM acquisition are not implemented yet.** Until they are, the UI shows Disconnected / Waiting for data. No measurements are simulated.
+The frontend polls `GET /api/telemetry` every 250 ms with no overlapping requests, a 3-second timeout, and a 1-second retry after failure. The firmware reads the AS5600 over I²C and serves measured RPM through this endpoint. See the [encoder wiring and validation guide](../README.md#esp32-pinout-and-as5600-encoder). No measurements are simulated.
 
 The expected JSON snapshot is:
 
@@ -99,14 +99,15 @@ The expected JSON snapshot is:
 }
 ```
 
-- `testId`: nonempty unique identifier for each test; changing it clears the prior graph.
+- `testId`: nonempty session identifier; the encoder firmware generates one per boot. Changing it clears the prior graph.
 - `status`: `ready`, `running`, `completed`, or `error`.
 - `elapsedMs`: finite, nonnegative milliseconds since test start; increase monotonically within a test.
 - `rpm`: finite, nonnegative motor speed (zero is a valid reading).
+- `message`: optional diagnostic text, displayed when the device reports an error.
 
-The chart displays a rolling 60-second window with an automatically scaled RPM axis. It retains at most 1,200 samples, ignores duplicate/out-of-order timestamps, and preserves the final readings after completion or connection loss. Ready snapshots do not add points. Polling collects snapshots rather than every sensor sample; higher-rate acquisition will need a batched or streaming firmware interface.
+The chart displays a rolling 60-second window with an automatically scaled RPM axis. It retains at most 1,200 samples, ignores duplicate/out-of-order timestamps, and preserves the final readings after completion or connection loss. Ready and error snapshots do not add points. Polling collects snapshots rather than every sensor sample; higher-rate acquisition will need a batched or streaming firmware interface.
 
-Requests use the current origin for ESP32 deployment. For local development with hardware, configure a Vite `/api` proxy to the device or provide a local mock endpoint returning this contract. Neither is configured by default. Sensor acquisition, motor control, and test automation remain planned.
+Requests use the current origin for ESP32 deployment. For local development with hardware, configure a Vite `/api` proxy to the device or provide a local mock endpoint returning this contract. Neither is configured by default. Torque/electrical sensing, motor control, and test automation remain planned.
 
 Run telemetry model checks with a Node version supporting TypeScript stripping:
 

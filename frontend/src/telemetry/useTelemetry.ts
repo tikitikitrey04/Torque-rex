@@ -35,7 +35,8 @@ export function useTelemetry() {
           return {
             testId: data.testId,
             status: data.status,
-            samples: data.status === 'ready' ? samples : appendSample(samples, data),
+            samples: data.status === 'ready' || data.status === 'error' ? samples : appendSample(samples, data),
+            message: data.message,
           }
         })
       } catch {

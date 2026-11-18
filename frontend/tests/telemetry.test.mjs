@@ -6,7 +6,7 @@ const valid = { testId: 'test-1', status: 'running', elapsedMs: 250, rpm: 3200 }
 test('accepts telemetry including zero RPM, rejects malformed measurements', () => {
   assert.deepEqual(parseTelemetry(valid), valid)
   assert.ok(parseTelemetry({ ...valid, elapsedMs: 0, rpm: 0 }))
-  for (const change of [{ rpm: -1 }, { rpm: Infinity }, { elapsedMs: NaN }, { elapsedMs: -1 }, { status: 'unknown' }, { testId: '' }, { rpm: '3200' }]) {
+  for (const change of [{ rpm: -1 }, { rpm: Infinity }, { elapsedMs: NaN }, { elapsedMs: -1 }, { status: 'unknown' }, { testId: '' }, { rpm: '3200' }, { message: 123 }]) {
     assert.equal(parseTelemetry({ ...valid, ...change }), null)
   }
   assert.equal(parseTelemetry(null), null)
@@ -23,4 +23,8 @@ test('bounds retained samples and preserves the latest reading', () => {
   assert.equal(samples.length, MAX_SAMPLES)
   assert.equal(samples[0].elapsedMs, 10)
   assert.equal(samples.at(-1).elapsedMs, MAX_SAMPLES + 9)
+})
+
+test('accepts encoder fault diagnostics', () => {
+  assert.ok(parseTelemetry({ ...valid, status: 'error', rpm: 0, message: 'AS5600 not responding' }))
 })
