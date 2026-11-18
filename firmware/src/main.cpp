@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <LittleFS.h>
+#include "Encoder.h"
 
 // Wi-Fi configuration
 const char* ssid = "Torque-rex";
@@ -114,7 +115,10 @@ void setup() {
     Serial.print("IP Address: ");
     Serial.println(WiFi.softAPIP());
 
+    startEncoder();
+
     // Register web routes
+    server.on("/api/telemetry", HTTP_GET, handleTelemetry);
     server.onNotFound(handleWebRequest);
 
     // Start HTTP server

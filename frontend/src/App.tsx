@@ -24,6 +24,7 @@ function Workspace() {
       </header>
       <main id="main" className="workspace">
         <RpmChart samples={telemetry.samples} status={telemetry.status} />
+        {telemetry.status === 'error' && <p role="alert">{telemetry.message}</p>}
       </main>
     </div>
   )

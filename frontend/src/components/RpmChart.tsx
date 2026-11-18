@@ -20,9 +20,11 @@ export function RpmChart({ samples, status }: { samples: Sample[]; status: TestS
   // Include one preceding sample so the line reaches the left edge smoothly.
   const firstVisible = samples.findIndex(sample => sample.elapsedMs >= start)
   const visible = firstVisible < 0 ? [] : samples.slice(Math.max(0, firstVisible - 1))
-  const maxRpm = Math.max(1000, Math.ceil(Math.max(...visible.map(sample => sample.rpm), 0) / 1000) * 1000)
+  const readings = visible.map(sample => sample.rpm)
+  const minRpm = (readings.length ? Math.min(...readings) : 0) - 30
+  const maxRpm = (readings.length ? Math.max(...readings) : 0) + 30
   const x = (time: number) => LEFT + (time - start) / WINDOW_MS * (WIDTH - LEFT - RIGHT)
-  const y = (rpm: number) => HEIGHT - BOTTOM - rpm / maxRpm * (HEIGHT - TOP - BOTTOM)
+  const y = (rpm: number) => HEIGHT - BOTTOM - (rpm - minRpm) / (maxRpm - minRpm) * (HEIGHT - TOP - BOTTOM)
   const points = visible.map(sample => `${x(sample.elapsedMs)},${y(sample.rpm)}`).join(' ')
   const clipId = useId()
 
@@ -42,7 +44,7 @@ export function RpmChart({ samples, status }: { samples: Sample[]; status: TestS
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={latest ? `Motor speed over elapsed test time. Latest sample: ${format.format(latest.rpm)} RPM at ${(latest.elapsedMs / 1000).toFixed(1)} seconds.` : 'RPM versus elapsed test time. Waiting for measurements.'}>
           <defs><clipPath id={clipId}><rect x={LEFT} y={TOP} width={WIDTH - LEFT - RIGHT} height={HEIGHT - TOP - BOTTOM} /></clipPath></defs>
           {[0, 1, 2].map(index => {
-            const rpm = maxRpm * index / 2
+            const rpm = minRpm + (maxRpm - minRpm) * index / 2
             return <g key={index}>
               <line className="rpm-chart__grid" x1={LEFT} x2={WIDTH - RIGHT} y1={y(rpm)} y2={y(rpm)} />
               <text x={LEFT - 12} y={y(rpm) + 4} textAnchor="end">{format.format(rpm)}</text>
