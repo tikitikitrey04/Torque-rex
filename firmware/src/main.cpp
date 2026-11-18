@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <LittleFS.h>
+#include "SerialLog.h"
 
 // Wi-Fi configuration
 const char* ssid = "Torque-rex";
@@ -10,6 +11,7 @@ const char* password = "TorqueRex2026";
 
 // HTTP server
 WebServer server(80);
+SerialLog Console;
 
 // Determine the content type of requested files
 String getContentType(const String& filename) {
@@ -57,8 +59,10 @@ bool serveFile(String path) {
 void handleWebRequest() {
     String path = server.uri();
 
-    Serial.print("HTTP request: ");
-    Serial.println(path);
+    if (!path.startsWith("/api/")) {
+        Console.print("HTTP request: ");
+        Console.println(path);
+    }
 
     // First look for the requested file
     if (serveFile(path)) {
@@ -80,48 +84,52 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
 
-    Serial.println();
-    Serial.println("=== Torque-rex Motor Test Suite ===");
+    Console.println();
+    Console.println("=== Torque-rex Motor Test Suite ===");
 
     // Initialize LittleFS
-    Serial.println("Mounting LittleFS...");
+    Console.println("Mounting LittleFS...");
 
     if (!LittleFS.begin(false)) {
-        Serial.println("ERROR: LittleFS mount failed!");
+        Console.println("ERROR: LittleFS mount failed!");
         return;
     }
 
-    Serial.println("LittleFS mounted successfully!");
+    Console.println("LittleFS mounted successfully!");
 
-    Serial.printf("Filesystem total: %lu bytes\n",
+    Console.printf("Filesystem total: %lu bytes\n",
                   (unsigned long)LittleFS.totalBytes());
 
-    Serial.printf("Filesystem used: %lu bytes\n",
+    Console.printf("Filesystem used: %lu bytes\n",
                   (unsigned long)LittleFS.usedBytes());
 
     // Start Wi-Fi access point
     WiFi.mode(WIFI_AP);
 
     if (!WiFi.softAP(ssid, password)) {
-        Serial.println("ERROR: Wi-Fi AP failed!");
+        Console.println("ERROR: Wi-Fi AP failed!");
         return;
     }
 
-    Serial.println("Wi-Fi started!");
-    Serial.print("SSID: ");
-    Serial.println(ssid);
+    Console.println("Wi-Fi started!");
+    Console.print("SSID: ");
+    Console.println(ssid);
 
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.softAPIP());
+    Console.print("IP Address: ");
+    Console.println(WiFi.softAPIP());
 
     // Register web routes
+    server.on("/api/serial", HTTP_GET, []() {
+        server.sendHeader("Cache-Control", "no-store");
+        server.send(200, "text/plain; charset=utf-8", Console.snapshot());
+    });
     server.onNotFound(handleWebRequest);
 
     // Start HTTP server
     server.begin();
 
-    Serial.println("HTTP server started!");
-    Serial.println("Torque-rex ready!");
+    Console.println("HTTP server started!");
+    Console.println("Torque-rex ready!");
 }
 
 void loop() {

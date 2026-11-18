@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { SerialMonitor } from './pages/SerialMonitor'
 import { RpmChart } from './components/RpmChart'
 import { useTelemetry } from './telemetry/useTelemetry'
 import { SuiteStatus } from './components/SuiteStatus'
@@ -8,11 +10,21 @@ import './App.css'
 function Workspace() {
   const { preference, setPreference } = useTheme()
   const telemetry = useTelemetry()
+  const [serialPage, setSerialPage] = useState(() => window.location.hash === '#/serial')
+  useEffect(() => {
+    const update = () => setSerialPage(window.location.hash === '#/serial')
+    window.addEventListener('hashchange', update)
+    return () => window.removeEventListener('hashchange', update)
+  }, [])
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a className="brand" href="#main">Torque<span>-rex</span></a>
+        <a className="brand" href="#/">Torque<span>-rex</span></a>
         <SuiteStatus status={telemetry.status} message={telemetry.message} />
+        <nav className="page-nav" aria-label="Pages">
+          <a href="#/" aria-current={!serialPage ? 'page' : undefined}>Test suite</a>
+          <a href="#/serial" aria-current={serialPage ? 'page' : undefined}>Serial output</a>
+        </nav>
         <label className="theme-control">
           Appearance
           <select value={preference} onChange={(event) => setPreference(event.target.value)}>
@@ -23,7 +35,7 @@ function Workspace() {
         </label>
       </header>
       <main id="main" className="workspace">
-        <RpmChart samples={telemetry.samples} status={telemetry.status} />
+        {serialPage ? <SerialMonitor /> : <RpmChart samples={telemetry.samples} status={telemetry.status} />}
       </main>
     </div>
   )

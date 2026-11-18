@@ -78,6 +78,16 @@ The filesystem partition is `0x3F0000` bytes (4032 KiB), including filesystem ov
 
 During standalone operation the ESP32 serves these static files from LittleFS, and the user's browser executes React. Node.js, npm, Vite, a separate application server, an external router, and internet access are not required to use the deployed app. The UI uses system font stacks and has no external font, stylesheet, or image requests.
 
+## Serial output page (testMode)
+
+Open **Serial output** in the header (or `http://192.168.4.1/#/serial`) to read recent firmware application output over Wi-Fi. Light/dark appearance is shared with the test-suite page. Pause/resume stops or restarts polling; Follow output controls automatic scrolling. Output stays visible during a connection failure and reconnects automatically. Text is displayed literally, without HTML interpretation.
+
+The page polls `GET /api/serial` every 500 ms with a 3-second timeout and no overlapping requests. The firmware returns a plain-text snapshot of its latest 16 KiB of application logs, including startup messages. Each response replaces the browser snapshot, so reconnects do not duplicate lines. The oldest bytes are overwritten when full; restarting the ESP32 clears the buffer. Pause freezes the browser view, while the device continues logging.
+
+Upload the updated firmware **and** rebuild/copy/upload the frontend filesystem using the deployment steps above. Then connect the end user's device to the Torque-rex Wi-Fi and open the serial page. No USB connection or Web Serial permission is needed on that device. Local Vite development requires a `/api` proxy to the ESP32 or a mock endpoint.
+
+Firmware output must use `Console.print()`, `Console.println()`, or `Console.printf()` to appear in both USB serial and the browser. Direct `Serial` writes, boot ROM messages, and third-party library diagnostics are not captured automatically. This page is a read-only log viewer; it does not send serial commands.
+
 ## Test-suite status
 
 `src/components/SuiteStatus.tsx` accepts a typed `status` (`ready`, `running`, `completed`, `error`, or `disconnected`) and an optional descriptive `message`. Status uses both text and theme-aware color, and changes are announced to assistive technology. Status colors are configured in `tokens.css`.

@@ -96,3 +96,16 @@ Reset the board to view startup messages. The firmware reports LittleFS mount su
 ## Planned work
 
 Sensor acquisition, motor control, live measurements, test automation, and browser/firmware data communication remain future work. Sensor wiring, control protocols, API schemas, and OTA deployment are not defined by the current implementation.
+
+## Browser serial monitor (testMode)
+
+`GET /api/serial` returns a noncached `text/plain` snapshot of the latest 16 KiB of application logs. `include/SerialLog.h` provides `Console`'s bounded ring buffer; use `Console.print`, `Console.println`, and `Console.printf` for messages that should go to both USB and the browser. Logging starts before Wi-Fi setup, so startup messages remain available after connection. API polls are not logged, preventing the monitor from filling its own buffer.
+
+After uploading firmware and the updated frontend filesystem, connect to Torque-rex Wi-Fi and open `http://192.168.4.1/#/serial`. Device restarts clear the buffer. ROM/SDK diagnostics and direct `Serial` writes are outside this application log capture. The current buffer is used from the Arduino main loop; concurrent task or ISR logging would require synchronization.
+
+Host buffer checks (from the repository root):
+
+```sh
+c++ -std=c++11 -I firmware/test/serial_log -I firmware/include firmware/test/serial_log/test.cpp -o /tmp/torque-rex-serial-log-test
+/tmp/torque-rex-serial-log-test
+```

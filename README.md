@@ -36,7 +36,7 @@ Torque-rex/
 
 Reported successful hardware tests include USB programming, detection of 16 MB flash and 8 MB PSRAM, Vite production builds, and serving the React application from LittleFS at `http://192.168.4.1` on the `Torque-rex` access point.
 
-The current code implements static HTTP hosting and a fallback for client-side routes. The frontend provides a minimal workspace with centralized design tokens, reusable UI components, and persistent light/dark/system appearance. Sensor acquisition, motor control, live measurements, test automation, a functional sensor-data API, and WebSockets are planned. OTA updates are not implemented.
+The current code implements static HTTP hosting, a fallback for client-side routes, and a browser serial-output page backed by a bounded application log endpoint (`/api/serial`). The frontend provides a minimal workspace with centralized design tokens, reusable UI components, and persistent light/dark/system appearance. Sensor acquisition, motor control, live measurements, test automation, a functional sensor-data API, and WebSockets are planned. OTA updates are not implemented.
 
 ## Developer quick start
 
