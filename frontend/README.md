@@ -1,6 +1,6 @@
 # Torque-rex frontend
 
-React and TypeScript application built with Vite for the Torque-rex motor test suite. The current UI is a minimal workspace with configurable styles and light/dark/system appearance; a measurement dashboard is planned. See the [project overview](../README.md) and [firmware guide](../firmware/README.md).
+React and TypeScript application built with Vite for the Torque-rex motor test suite. The current UI is a single-page workspace with a top-level test-suite status and light/dark/system appearance; a measurement dashboard is planned. See the [project overview](../README.md) and [firmware guide](../firmware/README.md).
 
 ## Prerequisites and installation
 
@@ -78,8 +78,38 @@ The filesystem partition is `0x3F0000` bytes (4032 KiB), including filesystem ov
 
 During standalone operation the ESP32 serves these static files from LittleFS, and the user's browser executes React. Node.js, npm, Vite, a separate application server, an external router, and internet access are not required to use the deployed app. The UI uses system font stacks and has no external font, stylesheet, or image requests.
 
+## Test-suite status
+
+`src/components/SuiteStatus.tsx` accepts a typed `status` (`ready`, `running`, `completed`, `error`, or `disconnected`) and an optional descriptive `message`. Status uses both text and theme-aware color, and changes are announced to assistive technology. Status colors are configured in `tokens.css`.
+
+`App.tsx` reads status and samples through `useTelemetry()`. Until a device telemetry endpoint is available, the header shows Disconnected and the chart waits for data.
+
 ## Future firmware communication
 
-The current frontend does not fetch sensor data or open WebSockets, and the firmware has no functional sensor-data API or WebSocket interface. Sensor acquisition, motor control, live measurements, and test automation remain planned.
+The frontend polls `GET /api/telemetry` every 250 ms with no overlapping requests, a 3-second timeout, and a 1-second retry after failure. **The firmware endpoint and RPM acquisition are not implemented yet.** Until they are, the UI shows Disconnected / Waiting for data. No measurements are simulated.
 
-A future UI will need a defined firmware communication interface for measurements and controls. Relative HTTP API requests could use the ESP32 origin when deployed; WebSockets are another possible future transport. Endpoints, payload schemas, update rates, and transport selection are not yet implemented. The Vite configuration currently has no backend proxy, so local development against future firmware endpoints will also need an explicit connection strategy.
+The expected JSON snapshot is:
+
+```json
+{
+  "testId": "test-001",
+  "status": "running",
+  "elapsedMs": 1250,
+  "rpm": 3200
+}
+```
+
+- `testId`: nonempty unique identifier for each test; changing it clears the prior graph.
+- `status`: `ready`, `running`, `completed`, or `error`.
+- `elapsedMs`: finite, nonnegative milliseconds since test start; increase monotonically within a test.
+- `rpm`: finite, nonnegative motor speed (zero is a valid reading).
+
+The chart displays a rolling 60-second window with an automatically scaled RPM axis. It retains at most 1,200 samples, ignores duplicate/out-of-order timestamps, and preserves the final readings after completion or connection loss. Ready snapshots do not add points. Polling collects snapshots rather than every sensor sample; higher-rate acquisition will need a batched or streaming firmware interface.
+
+Requests use the current origin for ESP32 deployment. For local development with hardware, configure a Vite `/api` proxy to the device or provide a local mock endpoint returning this contract. Neither is configured by default. Sensor acquisition, motor control, and test automation remain planned.
+
+Run telemetry model checks with a Node version supporting TypeScript stripping:
+
+```sh
+node --experimental-strip-types --test tests/telemetry.test.mjs
+```
