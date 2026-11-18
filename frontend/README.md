@@ -10,10 +10,10 @@ From the repository root:
 
 ```sh
 cd frontend
-npm ci
+npm install
 ```
 
-`npm ci` installs dependencies from `package-lock.json`. The stack includes React 19, TypeScript 7, Vite 8, and `@vitejs/plugin-react`. The React Compiler is not enabled.
+Alternatively, use `npm ci` to install dependencies from `package-lock.json`. The stack includes React 19, TypeScript 7, Vite 8, and `@vitejs/plugin-react`. The React Compiler is not enabled.
 
 ## Local development
 
@@ -29,11 +29,20 @@ Additional commands, also from `frontend/`:
 
 ```sh
 npm run lint
-npm run build
 npm run preview
 ```
 
-Linting uses Oxlint with the existing React, TypeScript, and Oxc rules in `.oxlintrc.json`. The build runs `tsc -b && vite build` to check TypeScript and produce static files in `dist/`. Preview serves that production output locally using Vite; it is not ESP32 deployment. `dist/` is generated and ignored by Git, and may be absent until a build is run.
+Linting uses Oxlint with the existing React, TypeScript, and Oxc rules in `.oxlintrc.json`. Preview serves the production output locally using Vite; it is not ESP32 deployment.
+
+## Production build
+
+From `frontend/`:
+
+```sh
+npm run build
+```
+
+The build runs `tsc -b && vite build` to check TypeScript, then Vite generates production-ready HTML, CSS, JavaScript, and other assets in `frontend/dist/`. `dist/` is generated and ignored by Git, and may be absent until a build is run.
 
 ## Themes and styling
 
@@ -52,31 +61,80 @@ For a custom font, place licensed `.woff2` files in `src/assets/fonts/`, declare
 
 ## Deploy to the ESP32
 
-Firmware must already be uploaded over USB as described in the [firmware guide](../firmware/README.md#upload-firmware-over-usb). Frontend deployment is manual:
+Torque-rex uses an ESP32-S3-N16R8 with 16 MB flash and 8 MB PSRAM. Firmware must already be uploaded over USB as described in the [firmware guide](../firmware/README.md#upload-firmware-over-usb).
 
-1. Run `npm run build` inside `frontend/`.
-2. Copy **the contents** of `frontend/dist/` into `firmware/data/`, including `index.html` and `assets/`. Replace the previous frontend files so stale hashed assets do not accumulate; preserve any intentional unrelated files. Do not copy the containing `dist/` folder.
-3. Open `firmware/` in PlatformIO and run **Upload Filesystem Image** for `esp32-s3`. This packages `data/` as LittleFS and writes it to the board over USB.
-4. Connect to the ESP32 Wi-Fi network `Torque-rex` using password `TorqueRex2026`.
-5. Open `http://192.168.4.1` in a browser. Stay connected if your device warns that the Wi-Fi network has no internet.
+From `frontend/`, build the dashboard and replace the deployed frontend files:
 
-For a POSIX shell, the build and copy commands below run from `frontend/` (the copy overwrites matching files but does not remove old assets):
-
-```sh
+```bash
 npm run build
-mkdir -p ../firmware/data
+rm -rf ../firmware/data/*
 cp -R dist/. ../firmware/data/
 ```
 
-Then, from `firmware/`, with the PlatformIO Core CLI available:
+Continue with the removal and copy only after the build succeeds. The removal deletes the previous contents of `firmware/data/`; keep any intentional unrelated files elsewhere before running it. Copy the contents of `dist/`, including `index.html` and `assets/`, rather than the containing folder.
+
+PlatformIO packages the contents of `firmware/data/` into a LittleFS filesystem image and uploads it to the board over USB. In VS Code:
+
+1. Open PlatformIO with the `firmware/` project selected.
+2. Navigate to **Project Tasks → esp32-s3 → Platform**.
+3. Select **Upload Filesystem Image**.
+4. Confirm the upload finishes successfully.
+5. Connect to the `Torque-rex` Wi-Fi network using password `TorqueRex2026`.
+6. Visit `http://192.168.4.1`. Stay connected if your device warns that the Wi-Fi network has no internet.
+
+Alternatively, from `firmware/`, with the PlatformIO Core CLI available:
 
 ```sh
 pio run -e esp32-s3 -t uploadfs
 ```
 
-The filesystem partition is `0x3F0000` bytes (4032 KiB), including filesystem overhead. Keep the complete deployed bundle within that capacity. Rebuild, copy, and upload the filesystem after frontend changes; uploading firmware alone does not update the UI.
+The filesystem partition is `0x3F0000` bytes (4032 KiB), including filesystem overhead. Keep the complete deployed bundle within that capacity.
 
-During standalone operation the ESP32 serves these static files from LittleFS, and the user's browser executes React. Node.js, npm, Vite, a separate application server, an external router, and internet access are not required to use the deployed app. The UI uses system font stacks and has no external font, stylesheet, or image requests.
+### Development versus deployment
+
+| Action | Result |
+| --- | --- |
+| `npm run dev` (from `frontend/`) | Runs Vite's local development server with hot reload on the developer's computer. |
+| `npm run build` (from `frontend/`) | Generates production files in `frontend/dist/`. |
+| **Upload Filesystem Image** | Deploys the files staged in `firmware/data/` to the ESP32's LittleFS partition. |
+| **Upload Firmware** | Updates the ESP32's C++ application. |
+
+Filesystem upload is separate from firmware upload. React changes generally require rebuilding, copying, and uploading the filesystem image, without recompiling or reflashing the C++ firmware. Uploading firmware alone does not update the UI.
+
+During standalone operation the ESP32 serves the compiled static files from LittleFS, and the user's browser executes React. No Node.js or Vite server runs on the ESP32. Node.js, npm, a separate application server, an external router, and internet access are not required to use the deployed app. The UI uses system font stacks and has no external font, stylesheet, or image requests.
+
+### Troubleshooting stale frontend deployments
+
+**Problem:** The React application builds successfully and updated files are present in `firmware/data/`, but the ESP32 continues serving an older website.
+
+During development, this was resolved by removing the previously generated LittleFS image. This is a confirmed solution for that occurrence; other stale deployments can have different causes.
+
+1. Close the PlatformIO Serial Monitor.
+2. Open a terminal in `firmware/`.
+3. Delete the generated LittleFS image:
+
+   ```bash
+   rm -f .pio/build/esp32-s3/littlefs.bin
+   ```
+
+4. Run **Upload Filesystem Image** again.
+5. Verify the updated frontend at `http://192.168.4.1`.
+
+Deleting `littlefs.bin` forces PlatformIO to regenerate the filesystem image from the current files in `firmware/data/` on the next filesystem upload.
+
+Use these diagnostic checks to investigate other possible causes:
+
+- Confirm `npm run build` completed successfully.
+- From `frontend/`, compare the build output with the staged files:
+
+  ```bash
+  diff -qr dist ../firmware/data
+  ```
+
+  No output means the directories match.
+- Verify PlatformIO targets the correct `firmware/` directory, especially in a VS Code multi-root workspace.
+- Check the filesystem upload terminal output for the expected project path and successful completion.
+- Rule out browser caching with a private browsing session or by clearing site data.
 
 ## Serial output page (testMode)
 
